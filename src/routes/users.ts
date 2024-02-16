@@ -1,5 +1,5 @@
 import express from 'express';
-import { createUser, deleteUser, updateUser, getUser, getUsers } from '../controllers/users';
+import { createUser, deleteUser, updateUser, getUser, getUsers } from '../handlers/users';
 import exp from 'constants';
 
 
