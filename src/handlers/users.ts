@@ -1,78 +1,61 @@
 import { NextFunction, Request, Response } from 'express';
 import { db } from '../config/db';
 import { User, UserUpdate } from '../types'
+import { asyncHandler } from '../middleware/asyncHandler';
 
-const getUsers = async (_: Request, res: Response, next: NextFunction) => {
-	try {
-		let results = await db.selectFrom('users')
+const listUsers = asyncHandler(async (_: Request, res: Response) => {
+	let results = await db.selectFrom('users')
 		.selectAll()
 		.execute()
 
-		res.json(results);
-	} catch (err) {
-		next(err)
-	}
-}
+	res.json(results);
+});
 
-const getUser = async (req: Request, res: Response, next: NextFunction) => {
-	try {
-		let id: number = parseInt(req.params.id)
-		let results = await db.selectFrom('users')
+const getUser = asyncHandler(async (req: Request, res: Response) => {
+	let id: number = parseInt(req.params.id)
+	let results = await db.selectFrom('users')
 		.where('id', '=', id)
 		.selectAll()
 		.executeTakeFirst()
 
-		res.json(results);
-	} catch (err) {
-		next(err)
-	}
-}
+	res.json(results);
+});
 
-const createUser = async (req: Request, res: Response, next: NextFunction) => {
-	try {
-		let user: User = req.body
-		let results = await db.insertInto('users')
+const createUser = asyncHandler(async (req: Request, res: Response) => {
+	let user: User = req.body
+	let results = await db.insertInto('users')
 		.values(user)
 		.returningAll()
 		.executeTakeFirstOrThrow()
 
-		res.send(results);
-	} catch (err) {
-		next(err)
-	}
-}
+	res.send(results);
+});
 
-const deleteUser = async (req: Request, res: Response, next: NextFunction) => {
-	try {
-		let id: number = parseInt(req.params.id)
-		let results = await db.deleteFrom('users')
-			.where('id', '=', id)
-			.returningAll()
-			.executeTakeFirstOrThrow()
+const deleteUser = asyncHandler(async (req: Request, res: Response) => {
+	let id: number = parseInt(req.params.id)
 
-		console.log(results)
-		res.send(results);
-	} catch (err) {
-		next(err)
-	}
-}
-const updateUser = async (req: Request, res: Response, next: NextFunction) => {
+	let results = await db.deleteFrom('users')
+		.where('id', '=', id)
+		.returningAll()
+		.executeTakeFirstOrThrow()
 
-	try {
-		let id: number = parseInt(req.params.id)
-		let userUpdate: UserUpdate = req.body
+	console.log(results)
+	res.send(results);
+});
 
-		let results = await db.updateTable('users')
-			.set(userUpdate)
-			.where('id', '=', id)
-			.returningAll()
-			.executeTakeFirstOrThrow()
+const updateUser = asyncHandler(async (req: Request, res: Response) => {
 
-		console.log(results)
-		res.send(results);
-	} catch (err) {
-		next(err);
-	}
-}
+	let id: number = parseInt(req.params.id)
+	let userUpdate: UserUpdate = req.body
 
-export { getUsers, getUser, createUser, deleteUser, updateUser }
+	let results = await db.updateTable('users')
+		.set(userUpdate)
+		.where('id', '=', id)
+		.returningAll()
+		.executeTakeFirstOrThrow()
+
+	console.log(results)
+	res.send(results);
+});
+
+export { listUsers, getUser, createUser, deleteUser, updateUser }
