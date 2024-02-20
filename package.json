@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "generate": "npx kanel -d postgresql://localhost:5432/chat -o ./src/models",
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node ./src/index.ts"
@@ -19,6 +20,9 @@
     "@typescript-eslint/eslint-plugin": "^7.0.1",
     "@typescript-eslint/parser": "^7.0.1",
     "eslint": "^8.56.0",
+    "kanel": "^3.8.8",
+    "kanel-kysely": "^0.3.3",
+    "kysely-codegen": "^0.11.0",
     "nodemon": "^3.0.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"

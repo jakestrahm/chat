@@ -2,20 +2,23 @@ import http from 'http'
 import express from 'express'
 import dotenv from 'dotenv'
 import { errorHandler } from './middleware/error'
-import { setUpWebSocket } from './websocket';
-import { router as users } from './routes/users'
+import { printToAllSockets, setUpWebSocket } from './websocket';
+import { router as user } from './routes/user'
 
 dotenv.config()
 const PORT = process.env.PORT || 8000;
 
 const app = express();
 const server = http.createServer(app);
-setUpWebSocket(server);
+const wss = setUpWebSocket(server);
 
 app.use(express.json());
 
 //routes
-app.use('/users', users)
+app.use('/user', user)
+app.use('/test', (req, res) => {
+	printToAllSockets(req, res, wss)
+})
 
 //middleware (must be after routes)
 app.use(errorHandler)

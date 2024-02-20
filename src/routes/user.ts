@@ -1,6 +1,5 @@
 import express from 'express';
-import { createUser, deleteUser, updateUser, getUser, listUsers } from '../handlers/users';
-import exp from 'constants';
+import { createUser, deleteUser, updateUser, getUser, listUsers } from '../handlers/user';
 
 
 const router = express.Router();
