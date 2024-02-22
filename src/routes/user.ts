@@ -1,5 +1,13 @@
 import express from 'express';
-import { createUser, deleteUser, updateUser, getUser, listUsers } from '../handlers/user';
+import {
+	signUp,
+	signIn,
+	signOut,
+	deleteUser,
+	updateUser,
+	getUser,
+	listUsers,
+} from '../handlers/user';
 
 
 const router = express.Router();
@@ -7,7 +15,15 @@ const router = express.Router();
 router
 	.route('/')
 	.get(listUsers)
-	.post(createUser)
+	.post(signUp)
+
+router
+	.route('/signIn')
+	.post(signIn)
+
+router
+	.route('/signOut')
+	.post(signOut)
 
 router
 	.route('/:id')
