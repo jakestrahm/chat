@@ -4,7 +4,6 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "generate": "npx kanel -d postgresql://localhost:5432/chat -o ./src/models",
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node ./src/index.ts"
@@ -15,7 +14,6 @@
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.11.17",
     "@types/pg": "^8.11.0",
     "@types/uuid": "^9.0.8",
@@ -23,9 +21,6 @@
     "@typescript-eslint/eslint-plugin": "^7.0.1",
     "@typescript-eslint/parser": "^7.0.1",
     "eslint": "^8.56.0",
-    "kanel": "^3.8.8",
-    "kanel-kysely": "^0.3.3",
-    "kysely-codegen": "^0.11.0",
     "nodemon": "^3.0.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
@@ -35,9 +30,9 @@
     "bcrypt": "^5.1.1",
     "dotenv": "^16.4.4",
     "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2",
-    "kysely": "^0.27.2",
+    "node-pg-migrate": "^6.2.2",
     "pg": "^8.11.3",
+    "postgres": "^3.4.3",
     "uuid": "^9.0.1",
     "validator": "^13.11.0",
     "ws": "^8.16.0"

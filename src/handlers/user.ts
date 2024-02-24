@@ -3,145 +3,162 @@ import { v4 as uuidv4 } from 'uuid'
 import validator from 'validator';
 import dotenv from 'dotenv'
 import { Request, Response } from 'express';
-import { db } from '../db/db';
-import { UserUpdate, NewUser, UserId } from '../models/public/User';
 import { asyncHandler } from '../middleware/asyncHandler';
-import { NewSession } from '../models/public/Session';
+import { sql } from './../db/db'
 
 dotenv.config();
 
 const listUsers = asyncHandler(async (_: Request, res: Response) => {
-	let results = await db.selectFrom('user')
-		.selectAll()
-		.execute()
+	let listUsers = await sql`
+		select
+			id,
+			username,
+			email,
+			created_at
+		from users `
 
-	res.json(results);
+	console.log(listUsers);
+	res.json(listUsers);
 });
 
 const getUser = asyncHandler(async (req: Request, res: Response) => {
-	const userId: UserId = parseInt(req.params.id) as any;
+	let getUser = await sql`
+		select
+			id,
+			username,
+			email,
+			created_at
+		from users
+		where id = ${parseInt(req.params.id)} `
 
-	let results = await db.selectFrom('user')
-		.where('id', '=', userId)
-		.selectAll()
-		.executeTakeFirstOrThrow()
-
-	res.json(results);
+	console.log(getUser)
+	res.json(getUser)
 });
 
-
 const deleteUser = asyncHandler(async (req: Request, res: Response) => {
-	const userId: UserId = parseInt(req.params.id) as any;
+	let deleteUser = await sql`
+		delete from users
+		where id = ${parseInt(req.params.id)}
+		returning id, username, email, created_at `
 
-	let results = await db.deleteFrom('user')
-		.where('id', '=', userId)
-		.returningAll()
-		.executeTakeFirstOrThrow()
+	if (deleteUser.length == 0) {
+		throw Error(`user with id ${req.params.id} not found`)
+	}
 
-	console.log(results)
-	res.send(results);
+	console.log(deleteUser)
+	res.json(deleteUser)
 });
 
 const updateUser = asyncHandler(async (req: Request, res: Response) => {
-	const userId: UserId = parseInt(req.params.id) as any;
-	let userUpdate: UserUpdate = req.body
 
-	let results = await db.updateTable('user')
-		.set(userUpdate)
-		.where('id', '=', userId)
-		.returningAll()
-		.executeTakeFirstOrThrow()
+	const validEmail = req.body?.email && validator.isEmail(req.body.email)
+	const validUsername = req.body?.username && validator.isLength(req.body.username, { min: 3, max: 20 })
+	const validId = await sql`select * from users where id = ${req.params.id}`
 
-	console.log(results)
-	res.send(results);
+	if (!validEmail && !validUsername) {
+		throw Error(`invalid ${validEmail == false ? `email` : `username`}`)
+	}
+
+	if (validId.length == 0) {
+		throw Error(`user with id ${req.params.id} not found`)
+	}
+
+
+	const updateUser = await sql`
+	 update users
+	 set
+	 ${validEmail ?
+			sql` email = ${req.body.email} `
+			: sql``
+		}
+	 ${validUsername ?
+			sql` username = ${req.body.username} `
+			: sql``
+		}
+	 where id = ${parseInt(req.params.id)}
+	 returning *
+	`
+	console.log(updateUser)
+	res.send({ updateUser });
 });
 
 const signUp = asyncHandler(async (req: Request, res: Response) => {
-	if (!validator.isEmail(req.body.email)) {
-		throw Error(`${req.body.email} is not a valid email.`)
+	const validEmail = req.body?.email && validator.isEmail(req.body.email)
+	const validUsername = req.body?.username && validator.isLength(req.body.username, { min: 3, max: 20 })
+	const validPassword = req.body?.password && validator.isStrongPassword(req.body.password)
+
+	if (!validEmail) {
+		throw Error(`invalid email`)
+	} else if (!validUsername) {
+		throw Error(`invalid username`)
+	} else if (!validPassword) {
+		throw Error(`invalid password`)
 	}
 
-	const emailInUse = await db.selectFrom('user')
-		.select('email')
-		.where('email', '=', req.body.email)
-		.executeTakeFirst();
+	//transaction
+	let createUser;
+	await sql.begin(async sql => {
 
-	if (emailInUse) {
-		throw Error(`${req.body.email} is already in use.`)
-	}
+		const emailInUse = await sql`select id from users where email = ${req.body.email}`
+		const usernameInUse = await sql`select id from users where username = ${req.body.username}`
 
-	const usernameInUse = await db.selectFrom('user')
-		.select('username')
-		.where('username', '=', req.body.username)
-		.executeTakeFirst();
+		if (emailInUse.length > 0) {
+			throw Error(`email in use`)
+		} else if (usernameInUse.length > 0) {
+			throw Error(`username in use`)
+		}
 
-	if (usernameInUse) {
-		throw Error(`${req.body.username} is already in use.`)
-	}
+		createUser = await sql`
+		insert into users (username, email, password_hash)
+		values (${req.body.username}, ${req.body.email}, ${await bcrypt.hash(req.body.password, 10)})
+		returning username, email, created_at `
 
-	let user: NewUser = {
-		username: req.body.username,
-		email: req.body.email,
-		password_hash: await bcrypt.hash(req.body.password, 10)
-	}
+		return createUser;
+	});
 
-	let results = await db.insertInto('user')
-		.values(user)
-		.returningAll()
-		.executeTakeFirstOrThrow()
-
-	res.send(results);
+	console.log(createUser)
+	res.send(createUser);
 });
 
 const signIn = asyncHandler(async (req: Request, res: Response) => {
-	const getPasswordHashQuery = db.selectFrom('user')
-		.select('password_hash')
-		.select('id')
 
-	if (req.body.email) {
-		const emailInUse = await db.selectFrom('user')
-			.select('email')
-			.where('email', '=', req.body.email)
-			.executeTakeFirst();
-
-		if (!emailInUse) {
-			throw Error(`an account with email '${req.body.email}' does not exist.`)
-		}
-
-		getPasswordHashQuery.where('email', '=', req.body.email)
-
-	} else if (req.body.username) {
-		const usernameInUse = await db.selectFrom('user')
-			.select('username')
-			.where('username', '=', req.body.username)
-			.executeTakeFirst();
-
-		if (!usernameInUse) {
-			throw Error(`an account with username '${req.body.username}' does not exist.`)
-		}
-
-		getPasswordHashQuery.where('username', '=', req.body.username)
+	if (!req.body.email && !req.body.username) {
+		throw Error('provide email or username.')
 	}
 
-	const getPasswordHash = await getPasswordHashQuery.executeTakeFirst()
+	if (!req.body.password) {
+		throw Error('provide password.')
+	}
+
+	const getUser = await sql`
+		select
+			password_hash,
+			id
+			${req.body.email ? sql`,email` : sql``}
+			${req.body.username ? sql`,username` : sql``}
+		from users
+		${req.body.email ? sql`where email = ${req.body.email}` : sql``}
+		${req.body.username ? sql`where username = ${req.body.username}` : sql``}
+		`
+	console.log({ getUser })
 
 	if (//if password_hash of corresponding record doesn't match hashed sent password
-		!(getPasswordHash?.password_hash
-			&& await bcrypt.compare(req.body.password, getPasswordHash.password_hash))) {
+		!(getUser[0]?.password_hash
+			&& await bcrypt.compare(req.body.password, getUser[0].password_hash))) {
 		throw Error('wrong password')
 	}
 
-	const token = uuidv4();
+	let token = uuidv4()
 
-	await db.insertInto('session')
-		.values({
-			user_id: getPasswordHash.id,
-			// Sets the session expiration to 1 hour from now
-			expires_at: new Date(new Date().getTime() + 60 * 60 * 1000),
-			token: token
-		})
-		.executeTakeFirstOrThrow();
+	const createSession = await sql`
+		insert into sessions (user_id, expires_at, token)
+		values(
+			${getUser[0].id},
+			${new Date(new Date().getTime() + 60 * 60 * 1000)},
+			${token})
+		`
 
+	console.log(createSession)
 	res.json(token)
 
 });

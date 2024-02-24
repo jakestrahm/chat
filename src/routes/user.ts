@@ -8,6 +8,7 @@ import {
 	getUser,
 	listUsers,
 } from '../handlers/user';
+import { protect } from '../middleware/auth';
 
 
 const router = express.Router();
@@ -28,6 +29,7 @@ router
 router
 	.route('/:id')
 	.get(getUser)
+	// .put(protect, updateUser)
 	.put(updateUser)
 	.delete(deleteUser)
 
