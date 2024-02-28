@@ -50,10 +50,9 @@ const deleteUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const updateUser = asyncHandler(async (req: Request, res: Response) => {
-
     const validEmail = req.body?.email && validator.isEmail(req.body.email)
     const validUsername = req.body?.username && validator.isLength(req.body.username, { min: 3, max: 20 })
-    const validId = await sql`select * from users where id = ${req.params.id}`
+    const validId = await sql`select id from users where id = ${req.params.id}`
 
     if (!validEmail && !validUsername) {
         throw Error(`invalid ${validEmail == false ? `email` : `username`}`)
@@ -164,6 +163,21 @@ const signIn = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const signOut = asyncHandler(async (req: Request, res: Response) => {
+    const token = req.headers.authorization
+
+
+    if (!token) {
+        throw Error('unauthorized')
+    }
+    const expireToken = await sql`
+        update sessions
+        set
+            expires_at = ${new Date(new Date().getTime())}
+        where token = ${token}
+        returning * `
+
+    console.log(expireToken)
+    res.json(expireToken)
 });
 
 export { listUsers, getUser, deleteUser, updateUser, signUp, signIn, signOut }

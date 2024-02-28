@@ -1,28 +1,33 @@
 import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from './asyncHandler';
-const protect = (asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-	const token = req.headers.authorization
+import { sql } from '../db/db';
+const protect = (asyncHandler(async (req: Request, _: Response, next: NextFunction) => {
+    const token = req.headers.authorization
+    console.log(token)
 
-	//will probably be sent implicitly
-	const userId: number = parseInt(req.params.id) as any;
+    //will probably be sent implicitly
+    const userId: number = parseInt(req.params.id);
+    console.log({ userId })
 
-	console.log({ userId })
+    if (token) {
+        const getSession = await sql`
+            select id
+            from sessions
+            where user_id = ${userId}
+            and token = ${token}
+            and expires_at > ${new Date(new Date().getTime())}
+            `
+        if (getSession.length > 0) {
+            console.log("getSession IS NOT EMPTY!")
+            next()
+        } else {
+            throw Error('unauthorized')
+        }
+    } else {
+        throw Error('unauthorized')
+    }
 
-	if (token) {
-		const getSession = true/*  = await db.selectFrom('session')
-			.selectAll()
-			.where('user_id', '=', userId)
-			// .where('expires_at', '>', new Date())
-			// .where('token', '=', token)
-			.executeTakeFirst(); */
-		console.log("session:", getSession)
 
-		if (getSession) {
-			next()
-		} else {
-			throw Error('user is not authorized to access this resource.')
-		}
-	}
 }));
 
 export { protect }
