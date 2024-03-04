@@ -29,7 +29,9 @@ router
 router
     .route('/:id')
     .get(getUser)
-    .put(protect, updateUser)
-    .delete(protect, deleteUser)
+    .put(updateUser)
+    .delete(deleteUser)
+// .put(protect, updateUser)
+// .delete(protect, deleteUser)
 
 export { router }

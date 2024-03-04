@@ -5,6 +5,7 @@ import dotenv from 'dotenv'
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { sql } from './../db/db'
+import { ResponseError } from '../utilities/ResponseError';
 
 dotenv.config();
 
@@ -36,13 +37,18 @@ const getUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const deleteUser = asyncHandler(async (req: Request, res: Response) => {
+    let userId: number = parseInt(req.params.id)
+    if (!userId) {
+        throw new ResponseError(`missing user id`, 400)
+    }
+
     let deleteUser = await sql`
 		delete from users
-		where id = ${parseInt(req.params.id)}
+		where id = ${userId}
 		returning id, username, email, created_at `
 
     if (deleteUser.length == 0) {
-        throw Error(`user with id ${req.params.id} not found`)
+        throw new ResponseError('no user with id ${userId} found', 404)
     }
 
     console.log(deleteUser)
@@ -55,28 +61,28 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
     const validId = await sql`select id from users where id = ${req.params.id}`
 
     if (!validEmail && !validUsername) {
-        throw Error(`invalid ${validEmail == false ? `email` : `username`}`)
+        throw new ResponseError(`invalid ${validEmail == false ? `email` : `username`}`, 400)
     }
 
     if (validId.length == 0) {
-        throw Error(`user with id ${req.params.id} not found`)
+        throw new ResponseError(`user with id ${req.params.id} not found`, 404)
     }
 
 
     const updateUser = await sql`
-	 update users
-	 set
-	 ${validEmail ?
+        update users
+        set
+            ${validEmail ?
             sql` email = ${req.body.email} `
             : sql``
         }
-	 ${validUsername ?
+            ${validUsername ?
             sql` username = ${req.body.username} `
             : sql``
         }
-	 where id = ${parseInt(req.params.id)}
-	 returning *
-	`
+        where id = ${parseInt(req.params.id)}
+        returning * `
+
     console.log(updateUser)
     res.send({ updateUser });
 });
@@ -87,11 +93,11 @@ const signUp = asyncHandler(async (req: Request, res: Response) => {
     const validPassword = req.body?.password && validator.isStrongPassword(req.body.password)
 
     if (!validEmail) {
-        throw Error(`invalid email`)
+        throw new ResponseError(`invalid email`, 400)
     } else if (!validUsername) {
-        throw Error(`invalid username`)
+        throw new ResponseError(`invalid username`, 400)
     } else if (!validPassword) {
-        throw Error(`invalid password`)
+        throw new ResponseError(`invalid password`, 400)
     }
 
     //transaction
@@ -102,15 +108,15 @@ const signUp = asyncHandler(async (req: Request, res: Response) => {
         const usernameInUse = await sql`select id from users where username = ${req.body.username}`
 
         if (emailInUse.length > 0) {
-            throw Error(`email in use`)
+            throw new ResponseError(`email in use`, 409)
         } else if (usernameInUse.length > 0) {
-            throw Error(`username in use`)
+            throw new ResponseError(`username in use`, 409)
         }
 
         createUser = await sql`
-		insert into users (username, email, password_hash)
-		values (${req.body.username}, ${req.body.email}, ${await bcrypt.hash(req.body.password, 10)})
-		returning username, email, created_at `
+            insert into users (username, email, password_hash)
+            values (${req.body.username}, ${req.body.email}, ${await bcrypt.hash(req.body.password, 10)})
+            returning username, email, created_at `
 
         return createUser;
     });
@@ -122,11 +128,11 @@ const signUp = asyncHandler(async (req: Request, res: Response) => {
 const signIn = asyncHandler(async (req: Request, res: Response) => {
 
     if (!req.body.email && !req.body.username) {
-        throw Error('provide email or username.')
+        throw new ResponseError('provide email or username.', 400)
     }
 
     if (!req.body.password) {
-        throw Error('provide password.')
+        throw new ResponseError('provide password.', 400)
     }
 
     const getUser = await sql`
@@ -144,7 +150,7 @@ const signIn = asyncHandler(async (req: Request, res: Response) => {
     if (//if password_hash of corresponding record doesn't match hashed sent password
         !(getUser[0]?.password_hash
             && await bcrypt.compare(req.body.password, getUser[0].password_hash))) {
-        throw Error('wrong password')
+        throw new ResponseError('incorrect password', 400)
     }
 
     let token = uuidv4()
@@ -165,16 +171,20 @@ const signIn = asyncHandler(async (req: Request, res: Response) => {
 const signOut = asyncHandler(async (req: Request, res: Response) => {
     const token = req.headers.authorization
 
-
     if (!token) {
-        throw Error('unauthorized')
+        throw new ResponseError('missing token', 401)
     }
+
     const expireToken = await sql`
         update sessions
         set
             expires_at = ${new Date(new Date().getTime())}
         where token = ${token}
         returning * `
+
+    if (expireToken.length == 0) {
+        throw new ResponseError('no coressponding session found', 404)
+    }
 
     console.log(expireToken)
     res.json(expireToken)
