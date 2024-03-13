@@ -3,5 +3,6 @@
 /src/models
 .env
 
-tasks.md
+/src/tasks.md
+/src/test.http
 scratch.js
