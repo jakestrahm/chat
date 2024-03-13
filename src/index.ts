@@ -3,7 +3,8 @@ import express from 'express'
 import dotenv from 'dotenv'
 import { errorHandler } from './middleware/error'
 import { printToAllSockets, setUpWebSocket } from './websocket';
-import { router as user } from './routes/user'
+import { registerUserRoutes } from './routes/user'
+import { sql } from './db/db';
 
 dotenv.config()
 const PORT = process.env.PORT || 8000;
@@ -15,14 +16,14 @@ const wss = setUpWebSocket(server);
 app.use(express.json());
 
 //routes
-app.use('/user', user)
+app.use('/user', registerUserRoutes(sql))
 app.use('/test', (req, res) => {
-	printToAllSockets(req, res, wss)
+    printToAllSockets(req, res, wss)
 })
 
 //middleware (must be after routes)
 app.use(errorHandler)
 
 server.listen(PORT, () => {
-	console.log(`server running on port ${PORT}`);
+    console.log(`server running on port ${PORT}`);
 });

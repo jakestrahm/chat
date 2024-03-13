@@ -9,29 +9,34 @@ import {
     listUsers,
 } from '../handlers/user';
 import { protect } from '../middleware/auth';
+import { Sql } from 'postgres';
 
+const registerUserRoutes = (sql: Sql) => {
+    const router = express.Router();
 
-const router = express.Router();
+    router
+        .route('/')
+        .get(listUsers(sql));
 
-router
-    .route('/')
-    .get(listUsers)
-    .post(signUp)
+    router
+        .route('/signUp')
+        .post(signUp(sql));
 
-router
-    .route('/signIn')
-    .post(signIn)
+    router
+        .route('/signIn')
+        .post(signIn(sql));
 
-router
-    .route('/signOut')
-    .post(signOut)
+    router
+        .route('/signOut')
+        .post(signOut(sql));
 
-router
-    .route('/:id')
-    .get(getUser)
-    .put(updateUser)
-    .delete(deleteUser)
-// .put(protect, updateUser)
-// .delete(protect, deleteUser)
+    router
+        .route('/:id')
+        .get(getUser(sql))
+        .put(updateUser(sql))
+        .delete(deleteUser(sql))
 
-export { router }
+    return router;
+}
+
+export { registerUserRoutes };
