@@ -10,20 +10,22 @@ import {
     selectUsers,
     deleteUserById,
     insertUser,
-    InsertUser
+    UserInsert,
+    UserUpdate,
+    updateUserById
 } from '../models/users';
 import { Sql } from 'postgres';
 
 dotenv.config();
 
-const listUsers = (sql: Sql) => asyncHandler(async (_: Request, res: Response) => {
-    let users = await selectUsers(sql)
+const listUsers = asyncHandler(async (_: Request, res: Response) => {
+    let users = await selectUsers()
     console.log({ users });
     res.json(users);
 });
 
-const getUser = (sql: Sql) => asyncHandler(async (req: Request, res: Response) => {
-    let user = await selectUserById(sql, parseInt(req.params.id))
+const getUser = asyncHandler(async (req: Request, res: Response) => {
+    let user = await selectUserById(parseInt(req.params.id))
 
     if (user.length == 0) {
         throw new ResponseError('no user with id ${userId} found', 404)
@@ -32,14 +34,14 @@ const getUser = (sql: Sql) => asyncHandler(async (req: Request, res: Response) =
     res.json(getUser)
 });
 
-const user = (sql: Sql) => asyncHandler(async (req: Request, res: Response) => {
+const user = asyncHandler(async (req: Request, res: Response) => {
     let id: number = parseInt(req.params.id)
 
     if (!id) {
         throw new ResponseError(`missing user id`, 400)
     }
 
-    let deleteUser = await deleteUserById(sql, id)
+    let deleteUser = await deleteUserById(id)
 
     if (deleteUser.length == 0) {
         throw new ResponseError('no user with id ${userId} found', 404)
@@ -49,39 +51,50 @@ const user = (sql: Sql) => asyncHandler(async (req: Request, res: Response) => {
     res.json(deleteUser)
 });
 
-const updateUser = (sql: Sql) => asyncHandler(async (req: Request, res: Response) => {
-    const validEmail = req.body?.email && validator.isEmail(req.body.email)
-    const validUsername = req.body?.username && validator.isLength(req.body.username, { min: 3, max: 20 })
-    const validId = await sql`select id from users where id = ${req.params.id}`
+const updateUser = asyncHandler(async (req: Request, res: Response) => {
+    const update: UserUpdate = {}
+    const email = req.body?.email
+    const username = req.body?.username
+    const password = req.body?.password
 
-    if (!validEmail && !validUsername) {
-        throw new ResponseError(`invalid ${validEmail == false ? `email` : `username`}`, 400)
+    if (email) {
+        const validEmail = validator.isEmail(email)
+
+        if (validEmail) {
+            update.email = req.body.email
+        } else {
+            throw new ResponseError(`invalid email`, 400)
+        }
     }
 
-    if (validId.length == 0) {
-        throw new ResponseError(`user with id ${req.params.id} not found`, 404)
+    if (username) {
+        const validusername = validator.isLength(req.body.username, { min: 3, max: 20 })
+
+        if (validusername) {
+            update.username = req.body.username
+        } else {
+            throw new ResponseError(`invalid username`, 400)
+        }
     }
 
+    if (password) {
+        const validpassword = validator.isStrongPassword(req.body.password)
 
-    const updateUser = await sql`
-        update users
-        set
-            ${validEmail ?
-            sql` email = ${req.body.email} `
-            : sql``
+        if (validpassword) {
+            update.password = req.body.password
+        } else {
+            throw new ResponseError(`invalid password`, 400)
         }
-            ${validUsername ?
-            sql` username = ${req.body.username} `
-            : sql``
-        }
-        where id = ${parseInt(req.params.id)}
-        returning id, username, email, created_at `
+    }
 
-    console.log(updateUser)
-    res.send({ updateUser });
+    console.log({ update })
+    // const updateUser = await updateUserById(sql, parseInt(req.params.id), update)
+    //
+    // console.log(updateUser)
+    // res.send({ updateUser });
 });
 
-const signUp = (sql: Sql) => asyncHandler(async (req: Request, res: Response) => {
+const signUp = asyncHandler(async (req: Request, res: Response) => {
     const validEmail = req.body?.email && validator.isEmail(req.body.email)
     const validUsername = req.body?.username && validator.isLength(req.body.username, { min: 3, max: 20 })
     const validPassword = req.body?.password && validator.isStrongPassword(req.body.password)
@@ -94,19 +107,19 @@ const signUp = (sql: Sql) => asyncHandler(async (req: Request, res: Response) =>
         throw new ResponseError(`invalid password`, 400)
     }
 
-    let newUser: InsertUser = {
+    let newUser: UserInsert = {
         email: req.body.email,
         username: req.body.username,
         password: req.body.password
     }
 
-    let createUser = await insertUser(sql, newUser)
+    let createUser = await insertUser(newUser)
 
     console.log(createUser)
     res.send(createUser);
 });
 
-const signIn = (sql: Sql) => asyncHandler(async (req: Request, res: Response) => {
+const signIn = asyncHandler(async (req: Request, res: Response) => {
 
     if (!req.body.email && !req.body.username) {
         throw new ResponseError('provide email or username.', 400)
@@ -115,60 +128,60 @@ const signIn = (sql: Sql) => asyncHandler(async (req: Request, res: Response) =>
     if (!req.body.password) {
         throw new ResponseError('provide password.', 400)
     }
+    /*
+        const getUser = await sql`
+            select
+                password_hash,
+                id
+                ${req.body.email ? sql`,email` : sql``}
+                ${req.body.username ? sql`,username` : sql``}
+            from users
+            ${req.body.email ? sql`where email = ${req.body.email}` : sql``}
+            ${req.body.username ? sql`where username = ${req.body.username}` : sql``}
+            `
+        console.log({ getUser })
 
-    const getUser = await sql`
-        select
-            password_hash,
-            id
-            ${req.body.email ? sql`,email` : sql``}
-            ${req.body.username ? sql`,username` : sql``}
-        from users
-        ${req.body.email ? sql`where email = ${req.body.email}` : sql``}
-        ${req.body.username ? sql`where username = ${req.body.username}` : sql``}
-        `
-    console.log({ getUser })
+        if (//if password_hash of corresponding record doesn't match hashed sent password
+            !(getUser[0]?.password_hash
+                && await bcrypt.compare(req.body.password, getUser[0].password_hash))) {
+            throw new ResponseError('incorrect password', 400)
+        }
 
-    if (//if password_hash of corresponding record doesn't match hashed sent password
-        !(getUser[0]?.password_hash
-            && await bcrypt.compare(req.body.password, getUser[0].password_hash))) {
-        throw new ResponseError('incorrect password', 400)
-    }
+        let token = uuidv4()
 
-    let token = uuidv4()
+        const createSession = await sql`
+            insert into sessions (user_id, expires_at, token)
+            values(
+                ${getUser[0].id},
+                ${new Date(new Date().getTime() + 60 * 60 * 1000)},
+                ${token})
+            `
 
-    const createSession = await sql`
-        insert into sessions (user_id, expires_at, token)
-        values(
-            ${getUser[0].id},
-            ${new Date(new Date().getTime() + 60 * 60 * 1000)},
-            ${token})
-        `
-
-    console.log(createSession)
-    res.json(token)
+        console.log(createSession)
+        res.json(token) */
 
 });
 
-const signOut = (sql: Sql) => asyncHandler(async (req: Request, res: Response) => {
-    const token = req.headers.authorization
+const signOut = asyncHandler(async (req: Request, res: Response) => {
+    /*     const token = req.headers.authorization
 
-    if (!token) {
-        throw new ResponseError('missing token', 401)
-    }
+        if (!token) {
+            throw new ResponseError('missing token', 401)
+        }
 
-    const expireToken = await sql`
-        update sessions
-        set
-            expires_at = ${new Date(new Date().getTime())}
-        where token = ${token}
-        returning * `
+        const expireToken = await sql`
+            update sessions
+            set
+                expires_at = ${new Date(new Date().getTime())}
+            where token = ${token}
+            returning * `
 
-    if (expireToken.length == 0) {
-        throw new ResponseError('no coressponding session found', 404)
-    }
+        if (expireToken.length == 0) {
+            throw new ResponseError('no coressponding session found', 404)
+        }
 
-    console.log(expireToken)
-    res.json(expireToken)
+        console.log(expireToken)
+        res.json(expireToken) */
 });
 
 export { listUsers, getUser, user as deleteUser, updateUser, signUp, signIn, signOut }

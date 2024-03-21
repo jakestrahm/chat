@@ -11,32 +11,28 @@ import {
 import { protect } from '../middleware/auth';
 import { Sql } from 'postgres';
 
-const registerUserRoutes = (sql: Sql) => {
-    const router = express.Router();
+const router = express.Router();
 
-    router
-        .route('/')
-        .get(listUsers(sql));
+router
+    .route('/')
+    .get(listUsers);
 
-    router
-        .route('/signUp')
-        .post(signUp(sql));
+router
+    .route('/signUp')
+    .post(signUp);
 
-    router
-        .route('/signIn')
-        .post(signIn(sql));
+router
+    .route('/signIn')
+    .post(signIn);
 
-    router
-        .route('/signOut')
-        .post(signOut(sql));
+router
+    .route('/signOut')
+    .post(signOut);
 
-    router
-        .route('/:id')
-        .get(getUser(sql))
-        .put(updateUser(sql))
-        .delete(deleteUser(sql))
+router
+    .route('/:id')
+    .get(getUser)
+    .put(updateUser)
+    .delete(deleteUser)
 
-    return router;
-}
-
-export { registerUserRoutes };
+export { router };

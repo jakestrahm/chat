@@ -3,7 +3,7 @@ import express from 'express'
 import dotenv from 'dotenv'
 import { errorHandler } from './middleware/error'
 import { printToAllSockets, setUpWebSocket } from './websocket';
-import { registerUserRoutes } from './routes/user'
+import { router as users } from './routes/user'
 import { sql } from './db/db';
 
 dotenv.config()
@@ -16,7 +16,7 @@ const wss = setUpWebSocket(server);
 app.use(express.json());
 
 //routes
-app.use('/user', registerUserRoutes(sql))
+app.use('/user', users)
 app.use('/test', (req, res) => {
     printToAllSockets(req, res, wss)
 })
